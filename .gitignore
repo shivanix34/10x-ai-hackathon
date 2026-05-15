@@ -1,0 +1,40 @@
+# OS/Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Backend (Go)
+backend/marketplace-orchestrator
+backend/bin/
+backend/tmp/
+
+# Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env.local
+frontend/.env.*.local
+
+# AI Services (Python)
+ai-services/__pycache__/
+ai-services/*.py[cod]
+ai-services/*$py.class
+ai-services/venv/
+ai-services/.env
+ai-services/.venv/
+
+# Infrastructure
+infrastructure/postgres_data/
+
+# Global Secrets & Keys
+.env
+.env.*
+*.env
+*.pem
+*.key
+secrets.json
+config.yaml
+config.yml
+*.sqlite3

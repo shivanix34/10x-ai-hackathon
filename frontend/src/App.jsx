@@ -15,7 +15,7 @@ function App() {
           <NavLink to="/sales" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Sales Console
           </NavLink>
-          <NavLink to="/seller/1" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink to="/seller/64000001" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Seller Experience
           </NavLink>
           <NavLink to="/monitoring" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>

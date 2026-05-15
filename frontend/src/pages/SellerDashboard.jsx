@@ -10,6 +10,7 @@ const SellerDashboard = () => {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   const sellerId = parseInt(id, 10);
   const { lastMessage, messages } = useWebSocket(sellerId, []);
@@ -18,8 +19,10 @@ const SellerDashboard = () => {
     try {
       const res = await api.getSeller(sellerId);
       setData(res);
+      setError(null);
     } catch (e) {
       console.error(e);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -57,7 +60,9 @@ const SellerDashboard = () => {
     api.simulateEvent({ seller_id: sellerId, event_type: 'login', event_value: 1 });
   };
 
-  if (loading || !data) return <div className="text-center p-12">Loading...</div>;
+  if (loading) return <div className="text-center p-12">Loading...</div>;
+  if (error) return <div className="text-center p-12 text-red-500">Error: {error}</div>;
+  if (!data) return <div className="text-center p-12">No data found.</div>;
 
   const { seller, behavior_state, quota, active_leads } = data;
 

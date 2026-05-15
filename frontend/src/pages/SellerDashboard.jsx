@@ -11,6 +11,7 @@ const SellerDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activity, setActivity] = useState([]);
   
   const sellerId = parseInt(id, 10);
   const { lastMessage, messages } = useWebSocket(sellerId, []);
@@ -19,6 +20,12 @@ const SellerDashboard = () => {
     try {
       const res = await api.getSeller(sellerId);
       setData(res);
+      console.log("[DEBUG] Seller Data:", res);
+      
+      // Fetch initial activity history
+      const eventsRes = await api.getSellerEvents(sellerId);
+      setActivity(eventsRes.events || []);
+      
       setError(null);
     } catch (e) {
       console.error(e);
@@ -162,13 +169,14 @@ const SellerDashboard = () => {
         {/* Activity Feed */}
         <Card title="Activity Stream" className="col-span-1">
           <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-            {messages.filter(m => m.type !== 'STATE_UPDATE' && m.type !== 'NEW_LEAD').map((m, i) => (
+            {/* Real-time WebSocket messages merged with history */}
+            {[...messages.filter(m => m.type !== 'STATE_UPDATE' && m.type !== 'NEW_LEAD'), ...activity].slice(0, 50).map((m, i) => (
               <div key={i} className="text-xs p-2 rounded bg-bg-secondary border-l-2 border-accent-cyan">
-                <div className="font-semibold text-text-secondary">{m.type}</div>
-                <div className="mt-1 text-text-muted truncate">{JSON.stringify(m.data)}</div>
+                <div className="font-semibold text-text-secondary">{m.type || m.event_type}</div>
+                <div className="mt-1 text-text-muted truncate">{m.data ? JSON.stringify(m.data) : (m.metadata || m.event_value)}</div>
               </div>
             ))}
-            {messages.length === 0 && <p className="text-text-muted text-sm">No recent WebSocket events.</p>}
+            {messages.length === 0 && activity.length === 0 && <p className="text-text-muted text-sm">No recent activity.</p>}
           </div>
         </Card>
       </div>

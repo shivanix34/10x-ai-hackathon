@@ -10,13 +10,9 @@ const SellerDashboard = () => {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-<<<<<<< Updated upstream
   const [error, setError] = useState(null);
   const [activity, setActivity] = useState([]);
   
-=======
-
->>>>>>> Stashed changes
   const sellerId = parseInt(id, 10);
   const { lastMessage, messages } = useWebSocket(sellerId, []);
 
@@ -67,25 +63,22 @@ const SellerDashboard = () => {
     }
   };
 
-
-<<<<<<< Updated upstream
-  if (loading) return <div className="text-center p-12">Loading...</div>;
-  if (error) return <div className="text-center p-12 text-red-500">Error: {error}</div>;
-  if (!data) return <div className="text-center p-12">No data found.</div>;
-=======
+  const simulateLogin = () => {
+    api.simulateEvent({ seller_id: sellerId, event_type: 'login', event_value: 1 });
+  };
 
   if (loading || !data) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
         <span>Loading seller details...</span>
+        {error && <div className="text-red-500 mt-4">Error: {error}</div>}
       </div>
     );
   }
->>>>>>> Stashed changes
 
   const { seller, behavior_state, quota, active_leads } = data;
-  const quotaPercent = Math.min((quota.consumed_weekly / quota.weekly_limit) * 100, 100);
+  const quotaPercent = Math.min(((quota.weekly_consumed || 0) / (quota.weekly_allocation || 1)) * 100, 100);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -114,7 +107,9 @@ const SellerDashboard = () => {
             <span>🏷️ {seller.service_name}</span>
           </div>
         </div>
-
+        <div className="flex items-center gap-4">
+          <Button variant="primary" onClick={simulateLogin}>Simulate Login</Button>
+        </div>
       </div>
 
       {/* ─── Intelligence + Quota Row ─── */}
@@ -151,24 +146,11 @@ const SellerDashboard = () => {
         </Card>
 
         {/* Quota Tracker */}
-<<<<<<< Updated upstream
-        <Card title="Consumption Quota" className="col-span-1">
-          <div className="flex flex-col items-center justify-center h-full pb-6">
-            <div className="text-5xl font-bold text-white mb-2">
-              {quota.weekly_consumed} <span className="text-2xl text-text-muted">/ {quota.weekly_allocation}</span>
-            </div>
-            <div className="text-sm text-text-secondary mb-6">Weekly Leads Consumed</div>
-            
-            <div className="w-full bg-bg-secondary h-3 rounded-full overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-accent-blue to-accent-cyan h-full transition-all duration-500"
-                style={{ width: `${Math.min((quota.weekly_consumed / quota.weekly_allocation) * 100, 100)}%` }}
-=======
         <Card title="Consumption Quota" icon="📈" className="col-span-1">
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 8px' }}>
             <div style={{ fontSize: '2.8rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
-              {quota.consumed_weekly}
-              <span style={{ fontSize: '1.3rem', color: 'var(--text-muted)', fontWeight: 500 }}> / {quota.weekly_limit}</span>
+              {quota.weekly_consumed || 0}
+              <span style={{ fontSize: '1.3rem', color: 'var(--text-muted)', fontWeight: 500 }}> / {quota.weekly_allocation || 0}</span>
             </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '8px 0 20px' }}>Weekly Leads Consumed</div>
 
@@ -181,7 +163,6 @@ const SellerDashboard = () => {
                     ? 'linear-gradient(90deg, var(--im-orange), var(--im-red))'
                     : 'linear-gradient(90deg, var(--im-blue), var(--im-blue-light))'
                 }}
->>>>>>> Stashed changes
               ></div>
             </div>
             <div className="helper-text">
@@ -233,37 +214,24 @@ const SellerDashboard = () => {
           </div>
         </Card>
 
-<<<<<<< Updated upstream
-        {/* Activity Feed */}
-        <Card title="Activity Stream" className="col-span-1">
-          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-            {/* Real-time WebSocket messages merged with history */}
-            {[...messages.filter(m => m.type !== 'STATE_UPDATE' && m.type !== 'NEW_LEAD'), ...activity].slice(0, 50).map((m, i) => (
-              <div key={i} className="text-xs p-2 rounded bg-bg-secondary border-l-2 border-accent-cyan">
-                <div className="font-semibold text-text-secondary">{m.type || m.event_type}</div>
-                <div className="mt-1 text-text-muted truncate">{m.data ? JSON.stringify(m.data) : (m.metadata || m.event_value)}</div>
-              </div>
-            ))}
-            {messages.length === 0 && activity.length === 0 && <p className="text-text-muted text-sm">No recent activity.</p>}
-=======
         {/* Activity Stream */}
         <Card title="Activity Stream" icon="📜" className="col-span-1">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
-            {messages.filter(m => m.type !== 'STATE_UPDATE' && m.type !== 'NEW_LEAD').map((m, i) => (
+            {/* Real-time WebSocket messages merged with history */}
+            {[...messages.filter(m => m.type !== 'STATE_UPDATE' && m.type !== 'NEW_LEAD'), ...activity].slice(0, 50).map((m, i) => (
               <div key={i} className="event-log-item">
-                <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '4px' }}>{m.type}</div>
+                <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '4px' }}>{m.type || m.event_type}</div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {JSON.stringify(m.data)}
+                  {m.data ? JSON.stringify(m.data) : (m.metadata || m.event_value)}
                 </div>
               </div>
             ))}
-            {messages.length === 0 && (
+            {messages.length === 0 && activity.length === 0 && (
               <div className="empty-state">
                 <div className="empty-state-icon">📭</div>
-                <p>No recent WebSocket events</p>
+                <p>No recent activity</p>
               </div>
             )}
->>>>>>> Stashed changes
           </div>
         </Card>
       </div>

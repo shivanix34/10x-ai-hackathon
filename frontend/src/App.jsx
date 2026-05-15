@@ -18,12 +18,11 @@ function App() {
             </div>
           </div>
 
-          <div className="nav-links">
             <NavLink to="/sales" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-link-icon">📊</span>
               Sales Console
             </NavLink>
-            <NavLink to="/seller/1" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/seller/64000001" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-link-icon">🏪</span>
               Seller Experience
             </NavLink>
@@ -35,18 +34,6 @@ function App() {
 
           <div className="nav-status">
           </div>
-<<<<<<< Updated upstream
-          <NavLink to="/sales" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            Sales Console
-          </NavLink>
-          <NavLink to="/seller/64000001" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            Seller Experience
-          </NavLink>
-          <NavLink to="/monitoring" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            System Health
-          </NavLink>
-=======
->>>>>>> Stashed changes
         </nav>
 
         {/* ─── Main Content ─── */}

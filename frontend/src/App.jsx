@@ -18,6 +18,7 @@ function App() {
             </div>
           </div>
 
+          <div className="nav-links">
             <NavLink to="/sales" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-link-icon">📊</span>
               Sales Console
@@ -48,7 +49,7 @@ function App() {
 
         {/* ─── Footer ─── */}
         <footer className="footer">
-          Powered by <strong style={{ color: 'var(--im-blue)' }}>IndiaMART</strong> — AI-driven Seller Intelligence & BuyLead Orchestration
+          Powered by <strong style={{ color: 'var(--im-blue)' }}>IndiaMART</strong> — AI-driven Seller Intelligence &amp; BuyLead Orchestration
         </footer>
       </div>
     </BrowserRouter>

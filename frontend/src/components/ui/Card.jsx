@@ -1,12 +1,24 @@
 import React from 'react';
 
-export const Card = ({ children, className = '', title, subtitle }) => {
+const iconMap = {
+  blue: '👥',
+  emerald: '💚',
+  rose: '⚠️',
+  amber: '💤',
+  cyan: '🔗',
+  violet: '🔌',
+};
+
+export const Card = ({ children, className = '', title, subtitle, icon }) => {
   return (
     <div className={`glass-card animate-in ${className}`}>
       {(title || subtitle) && (
-        <div className="mb-4">
-          {title && <h3 className="text-lg font-semibold text-white">{title}</h3>}
-          {subtitle && <p className="text-sm text-text-muted">{subtitle}</p>}
+        <div className="card-header">
+          <div className="card-title">
+            {icon && <span className="card-title-icon">{icon}</span>}
+            {title}
+          </div>
+          {subtitle && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{subtitle}</span>}
         </div>
       )}
       {children}
@@ -14,17 +26,44 @@ export const Card = ({ children, className = '', title, subtitle }) => {
   );
 };
 
-export const MetricCard = ({ title, value, subvalue, trend, type = 'blue' }) => {
+export const MetricCard = ({ title, value, subvalue, trend, type = 'blue', icon, onClick, active }) => {
+  const defaultIcon = icon || iconMap[type] || '📈';
+  const isClickable = !!onClick;
+
   return (
-    <div className={`metric-card glow-${type}`}>
-      <div className="text-sm font-medium text-text-secondary mb-1">{title}</div>
-      <div className="flex items-baseline gap-2">
-        <div className="text-3xl font-bold text-white">{value}</div>
-        {subvalue && <div className="text-sm text-text-muted">{subvalue}</div>}
+    <div
+      className={`metric-card type-${type} animate-in ${isClickable ? 'metric-card-clickable' : ''} ${active ? 'metric-card-active' : ''}`}
+      onClick={onClick}
+      style={isClickable ? { cursor: 'pointer' } : {}}
+    >
+      <div className={`metric-icon type-${type}`}>
+        {defaultIcon}
+      </div>
+      <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '4px' }}>
+        {title}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+        <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+          {value}
+        </div>
+        {subvalue && <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{subvalue}</div>}
       </div>
       {trend && (
-        <div className={`text-xs mt-2 font-medium ${trend > 0 ? 'text-accent-emerald' : 'text-accent-rose'}`}>
+        <div style={{
+          fontSize: '0.75rem',
+          marginTop: '8px',
+          fontWeight: 600,
+          color: trend > 0 ? 'var(--im-green)' : 'var(--im-red)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px'
+        }}>
           {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}% from last week
+        </div>
+      )}
+      {isClickable && (
+        <div style={{ fontSize: '0.7rem', color: 'var(--im-blue)', marginTop: '8px', fontWeight: 500 }}>
+          Click to view details →
         </div>
       )}
     </div>

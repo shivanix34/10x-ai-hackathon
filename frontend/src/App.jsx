@@ -7,11 +7,35 @@ import MonitoringDashboard from './pages/MonitoringDashboard';
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-bg-primary text-text-primary">
-        <nav className="nav-container gap-4">
-          <div className="font-bold text-xl mr-8 bg-gradient-to-r from-accent-blue to-accent-cyan bg-clip-text text-transparent">
-            MarketplaceOS
+      <div className="min-h-screen" style={{ background: 'var(--bg-body)', color: 'var(--text-primary)' }}>
+        {/* ─── Top Navigation ─── */}
+        <nav className="nav-container">
+          <div className="nav-logo">
+            <img src="/indiamart.png" alt="IndiaMART" className="nav-logo-img" />
+            <div>
+              <div className="nav-logo-text">IndiaMART</div>
+              <span className="nav-logo-sub">Intelligence Platform</span>
+            </div>
           </div>
+
+          <div className="nav-links">
+            <NavLink to="/sales" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="nav-link-icon">📊</span>
+              Sales Console
+            </NavLink>
+            <NavLink to="/seller/1" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="nav-link-icon">🏪</span>
+              Seller Experience
+            </NavLink>
+            <NavLink to="/monitoring" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="nav-link-icon">⚙️</span>
+              System Health
+            </NavLink>
+          </div>
+
+          <div className="nav-status">
+          </div>
+<<<<<<< Updated upstream
           <NavLink to="/sales" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Sales Console
           </NavLink>
@@ -21,9 +45,12 @@ function App() {
           <NavLink to="/monitoring" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             System Health
           </NavLink>
+=======
+>>>>>>> Stashed changes
         </nav>
 
-        <main className="p-6 max-w-7xl mx-auto">
+        {/* ─── Main Content ─── */}
+        <main style={{ padding: '1.5rem', maxWidth: '1400px', margin: '0 auto' }}>
           <Routes>
             <Route path="/" element={<Navigate to="/sales" replace />} />
             <Route path="/sales" element={<SalesDashboard />} />
@@ -31,6 +58,11 @@ function App() {
             <Route path="/monitoring" element={<MonitoringDashboard />} />
           </Routes>
         </main>
+
+        {/* ─── Footer ─── */}
+        <footer className="footer">
+          Powered by <strong style={{ color: 'var(--im-blue)' }}>IndiaMART</strong> — AI-driven Seller Intelligence & BuyLead Orchestration
+        </footer>
       </div>
     </BrowserRouter>
   );

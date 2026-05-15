@@ -53,6 +53,7 @@ func NewRouter(hub *ws.Hub) http.Handler {
 
 	// Simulation
 	r.HandleFunc("/api/simulate/event", makeSimulateEventHandler(hub)).Methods("POST")
+	r.HandleFunc("/api/simulate/lead", makeSimulateLeadHandler(hub)).Methods("POST")
 
 	// WebSocket
 	r.HandleFunc("/ws", hub.HandleWS)
@@ -510,5 +511,56 @@ func makeSimulateEventHandler(hub *ws.Hub) http.HandlerFunc {
 		})
 		mq.Publish(mq.QueueSellerActivity, evt)
 		respondJSON(w, 200, map[string]string{"status": "event published"})
+	}
+}
+func makeSimulateLeadHandler(hub *ws.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			LeadID string `json:"lead_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			respondJSON(w, 400, map[string]string{"error": "invalid request"})
+			return
+		}
+
+		// If no LeadID provided, pick a random unrouted one
+		if body.LeadID == "" {
+			ids, _ := routing.GetUnroutedLeads(1)
+			if len(ids) > 0 {
+				body.LeadID = ids[0]
+			}
+		}
+
+		if body.LeadID == "" {
+			respondJSON(w, 404, map[string]string{"error": "no leads to simulate"})
+			return
+		}
+
+		routings, err := routing.RouteLeadToSellers(body.LeadID)
+		if err != nil {
+			respondJSON(w, 500, map[string]string{"error": err.Error()})
+			return
+		}
+
+		if len(routings) == 0 {
+			respondJSON(w, 200, map[string]string{"status": "lead skipped (no matches)"})
+			return
+		}
+
+		// Broadcast to sellers
+		lead, _, _ := routing.GetLeadWithRouting(body.LeadID)
+		for _, r := range routings {
+			hub.BroadcastToSeller(r.SellerID, ws.Message{
+				Type: "NEW_LEAD",
+				Data: map[string]interface{}{
+					"lead":          lead,
+					"routing_id":    r.ID,
+					"routing_score": r.RoutingScore,
+					"seller_id":     r.SellerID,
+				},
+			})
+		}
+
+		respondJSON(w, 200, map[string]interface{}{"status": "lead routed", "sellers_count": len(routings)})
 	}
 }

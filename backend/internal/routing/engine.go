@@ -83,6 +83,8 @@ func RouteLeadToSellers(leadID string) ([]models.LeadRouting, error) {
 	}
 
 	if len(eligible) == 0 {
+		// Mark as routed/skipped so simulator doesn't get stuck in a loop
+		db.DB.Exec(`UPDATE leads SET routed = true, status = 'SKIPPED' WHERE lead_id = $1`, leadID)
 		return nil, nil
 	}
 

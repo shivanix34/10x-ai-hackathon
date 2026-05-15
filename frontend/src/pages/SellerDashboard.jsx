@@ -117,14 +117,14 @@ const SellerDashboard = () => {
         <Card title="Consumption Quota" className="col-span-1">
           <div className="flex flex-col items-center justify-center h-full pb-6">
             <div className="text-5xl font-bold text-white mb-2">
-              {quota.consumed_weekly} <span className="text-2xl text-text-muted">/ {quota.weekly_limit}</span>
+              {quota.weekly_consumed} <span className="text-2xl text-text-muted">/ {quota.weekly_allocation}</span>
             </div>
             <div className="text-sm text-text-secondary mb-6">Weekly Leads Consumed</div>
             
             <div className="w-full bg-bg-secondary h-3 rounded-full overflow-hidden">
               <div 
                 className="bg-gradient-to-r from-accent-blue to-accent-cyan h-full transition-all duration-500"
-                style={{ width: `${Math.min((quota.consumed_weekly / quota.weekly_limit) * 100, 100)}%` }}
+                style={{ width: `${Math.min((quota.weekly_consumed / quota.weekly_allocation) * 100, 100)}%` }}
               ></div>
             </div>
           </div>

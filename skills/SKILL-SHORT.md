@@ -126,7 +126,7 @@ EMERGING → ENGAGED → MAINTAINING → DISENGAGING → AT_RISK → DORMANT
 - Compute: 2-3 nodes → 5-10 nodes → 20+ nodes (k8s)
 - Latency: <200ms p95 for churn scoring
 
-## EStimated Success Criteria
+## Estimated Success Criteria
 
 ✅ Intervention execution <2 hrs (P0), <24 hrs (P1)
 ✅ Seller response rate >35%

@@ -50,6 +50,13 @@ func NewRouter(hub *ws.Hub) http.Handler {
 	// Interventions
 	r.HandleFunc("/api/interventions", listInterventionsHandler).Methods("GET")
 	r.HandleFunc("/api/interventions/{id}/resolve", resolveInterventionHandler).Methods("POST")
+	r.HandleFunc("/api/interventions/{id}/unbookmark", unbookmarkInterventionHandler).Methods("POST")
+
+	// Bookmark (creates intervention from sales console)
+	r.HandleFunc("/api/sellers/{id}/bookmark", bookmarkSellerHandler).Methods("POST")
+
+	// Churn Analysis
+	r.HandleFunc("/api/dashboard/churn-analysis", churnAnalysisHandler).Methods("GET")
 
 	// Simulation
 	r.HandleFunc("/api/simulate/event", makeSimulateEventHandler(hub)).Methods("POST")
@@ -491,6 +498,98 @@ func resolveInterventionHandler(w http.ResponseWriter, r *http.Request) {
 	db.DB.Exec(`UPDATE seller_behavior_state SET intervention_status='RESOLVED' WHERE seller_id=$1`, sellerID)
 	behavior.MutateSellerState(sellerID, "INTERVENTION_RESOLVED", 1)
 	respondJSON(w, 200, map[string]string{"status": "resolved"})
+}
+
+func unbookmarkInterventionHandler(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	_, err := db.DB.Exec(`DELETE FROM interventions WHERE id=$1`, id)
+	if err != nil {
+		respondJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, 200, map[string]string{"status": "removed"})
+}
+
+func bookmarkSellerHandler(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Reason == "" {
+		body.Reason = "Bookmarked by sales team for review"
+	}
+
+	var intID int
+	err := db.DB.QueryRow(`
+		INSERT INTO interventions (seller_id, intervention_type, reason, priority, status)
+		VALUES ($1, 'SALES_REVIEW', $2, 'HIGH', 'PENDING')
+		RETURNING id
+	`, id, body.Reason).Scan(&intID)
+	if err != nil {
+		respondJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, 200, map[string]interface{}{"status": "bookmarked", "intervention_id": intID})
+}
+
+func churnAnalysisHandler(w http.ResponseWriter, r *http.Request) {
+	type ChurnFactor struct {
+		Factor     string  `json:"factor"`
+		Count      int     `json:"count"`
+		Percentage float64 `json:"percentage"`
+	}
+
+	var totalHR int
+	db.DB.QueryRow(`SELECT COUNT(*) FROM seller_behavior_state WHERE churn_risk='High'`).Scan(&totalHR)
+	if totalHR == 0 {
+		totalHR = 1 // prevent div by 0
+	}
+
+	var lowCatalog, lowEngagement, lowResponse, lowQuota, highTickets int
+
+	db.DB.QueryRow(`
+		SELECT COUNT(*) FROM seller_behavior_state bs
+		JOIN sellers s ON s.seller_id = bs.seller_id
+		WHERE bs.churn_risk='High' AND s.catalog_quality_score < 40
+	`).Scan(&lowCatalog)
+
+	db.DB.QueryRow(`
+		SELECT COUNT(*) FROM seller_behavior_state
+		WHERE churn_risk='High' AND engagement_score < 30
+	`).Scan(&lowEngagement)
+
+	db.DB.QueryRow(`
+		SELECT COUNT(*) FROM seller_behavior_state
+		WHERE churn_risk='High' AND response_efficiency < 30
+	`).Scan(&lowResponse)
+
+	db.DB.QueryRow(`
+		SELECT COUNT(*) FROM seller_behavior_state
+		WHERE churn_risk='High' AND quota_utilization < 20
+	`).Scan(&lowQuota)
+
+	db.DB.QueryRow(`
+		SELECT COUNT(*) FROM seller_behavior_state bs
+		JOIN sellers s ON s.seller_id = bs.seller_id
+		WHERE bs.churn_risk='High' AND s.support_ticket_count > 3
+	`).Scan(&highTickets)
+
+	pct := func(n int) float64 { return float64(n) / float64(totalHR) * 100 }
+
+	factors := []ChurnFactor{
+		{"Low Catalog Score (<40)", lowCatalog, pct(lowCatalog)},
+		{"Low Engagement (<30)", lowEngagement, pct(lowEngagement)},
+		{"Poor Response Rate (<30%)", lowResponse, pct(lowResponse)},
+		{"Low Quota Usage (<20%)", lowQuota, pct(lowQuota)},
+		{"High Support Tickets (>3)", highTickets, pct(highTickets)},
+	}
+
+	respondJSON(w, 200, map[string]interface{}{
+		"total_high_risk": totalHR,
+		"factors":         factors,
+	})
 }
 
 func makeSimulateEventHandler(hub *ws.Hub) http.HandlerFunc {

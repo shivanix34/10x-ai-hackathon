@@ -110,6 +110,18 @@ def score_recommendation(seller_id: int):
     finally:
         conn.close()
 
+@app.post("/score/seller-analysis")
+def score_seller_analysis(seller_id: int):
+    """Generate comprehensive AI analysis of a seller for the sales team"""
+    conn = get_db()
+    try:
+        analysis = generate_seller_analysis(conn, seller_id)
+        if analysis:
+            return {"status": "ok", "seller_id": seller_id, "analysis": analysis}
+        return {"status": "error", "message": "Seller not found"}
+    finally:
+        conn.close()
+
 @app.get("/score/sales-insights")
 def get_sales_insights():
     """Generate AI-powered sales console insights"""

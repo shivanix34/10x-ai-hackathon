@@ -6,30 +6,6 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Link } from 'react-router-dom';
 
-/* ── Event type icon & label mapping ─────────────────── */
-const eventConfig = {
-  login:           { icon: '🔑', label: 'Logged In',         css: 'login' },
-  lead_response:   { icon: '📩', label: 'Responded to Lead', css: 'lead_response' },
-  product_update:  { icon: '📦', label: 'Updated Product',   css: 'product_update' },
-  catalog_update:  { icon: '🗂️', label: 'Updated Catalog',   css: 'catalog_update' },
-  profile_update:  { icon: '👤', label: 'Updated Profile',   css: 'profile_update' },
-  support_ticket:  { icon: '🎫', label: 'Raised Ticket',     css: 'support_ticket' },
-};
-
-const getEventConfig = (type) => eventConfig[type] || { icon: '📌', label: type, css: 'default' };
-
-const formatTime = (ts) => {
-  const d = new Date(ts);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHrs = Math.floor(diffMin / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-};
-
 /* ── Drill-down panel component ──────────────────────── */
 const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
   const [search, setSearch] = useState('');
@@ -59,15 +35,12 @@ const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
         <button className="drilldown-close" onClick={onClose} title="Close">✕</button>
       </div>
 
-      {/* Search */}
       <div className="search-input-wrap">
         <span className="search-icon">🔍</span>
         <input
-          className="search-input"
-          type="text"
+          className="search-input" type="text"
           placeholder="Search by name, ID, or city..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={search} onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
@@ -78,7 +51,7 @@ const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
         </div>
       ) : (
         <>
-          <div className="result-count">
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
             {filtered.length === sellers?.length
               ? `Showing all ${filtered.length} sellers`
               : `${filtered.length} of ${sellers?.length} sellers match your search`}
@@ -87,7 +60,9 @@ const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
             {filtered.map((s) => (
               <div key={s.seller_id} className="seller-list-item">
                 <div>
-                  <Link to={`/seller/${s.seller_id}`}>{s.company_name || `Seller #${s.seller_id}`}</Link>
+                  <Link to={`/sales/seller/${s.seller_id}`} style={{ fontWeight: 600, color: 'var(--im-blue)', textDecoration: 'none' }}>
+                    {s.company_name || `Seller #${s.seller_id}`}
+                  </Link>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                     {s.city && `📍 ${s.city}`}
                     {s.health_score != null && ` • Health: ${Math.round(s.health_score)}`}
@@ -101,8 +76,8 @@ const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
                   {s.persona_type && (
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '12px' }}>{s.persona_type}</span>
                   )}
-                  <Link to={`/seller/${s.seller_id}`} style={{ fontSize: '0.75rem', color: 'var(--im-blue)', textDecoration: 'none' }}>
-                    View →
+                  <Link to={`/sales/seller/${s.seller_id}`} style={{ fontSize: '0.75rem', color: 'var(--im-blue)', textDecoration: 'none' }}>
+                    Review →
                   </Link>
                 </div>
               </div>
@@ -119,6 +94,13 @@ const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
   );
 };
 
+/* ── Churn factor colors ─────────────────────────────── */
+const factorColors = [
+  'var(--im-red)', 'var(--im-orange)', 'var(--im-blue)',
+  'var(--im-amber)', '#7C3AED'
+];
+const factorIcons = ['📋', '💤', '⏱️', '📉', '🎫'];
+
 /* ── Main Dashboard ──────────────────────────────────── */
 const SalesDashboard = () => {
   const [data, setData] = useState(null);
@@ -126,21 +108,25 @@ const SalesDashboard = () => {
   const { lastMessage } = useWebSocket(null, ['sales']);
 
   // Drill-down state
-  const [activeMetric, setActiveMetric] = useState(null); // 'active' | 'health' | 'churning' | 'lazy'
+  const [activeMetric, setActiveMetric] = useState(null);
   const [drilldownSellers, setDrilldownSellers] = useState(null);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
 
-  // High risk search
+  // Search states
   const [highRiskSearch, setHighRiskSearch] = useState('');
+  const [interventionSearch, setInterventionSearch] = useState('');
 
-  // AI Insights
-  const [aiInsights, setAiInsights] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
+  // Churn analysis
+  const [churnData, setChurnData] = useState(null);
 
   const loadData = async () => {
     try {
-      const res = await api.getSalesDashboard();
-      setData(res);
+      const [dashRes, churnRes] = await Promise.all([
+        api.getSalesDashboard(),
+        api.getChurnAnalysis(),
+      ]);
+      setData(dashRes);
+      setChurnData(churnRes);
     } catch (e) {
       console.error(e);
     } finally {
@@ -148,31 +134,19 @@ const SalesDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    loadData();
-    loadInsights();
-  }, []);
-
-  const loadInsights = async () => {
-    setAiLoading(true);
-    try {
-      const res = await api.getSalesInsights();
-      setAiInsights(res.insights);
-    } catch (e) {
-      console.error('[AI Insights]', e);
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
-    if (lastMessage && lastMessage.type === 'SELLER_STATE_CHANGE') {
-      loadData();
-    }
+    if (lastMessage && lastMessage.type === 'SELLER_STATE_CHANGE') loadData();
   }, [lastMessage]);
 
   const resolveIntervention = async (id) => {
     await api.resolveIntervention(id);
+    loadData();
+  };
+
+  const unbookmarkIntervention = async (id) => {
+    await api.unbookmarkIntervention(id);
     loadData();
   };
 
@@ -183,37 +157,20 @@ const SalesDashboard = () => {
       setDrilldownSellers(null);
       return;
     }
-
     setActiveMetric(metricType);
     setDrilldownLoading(true);
     setDrilldownSellers(null);
-
     try {
       let res;
       switch (metricType) {
-        case 'active':
-          res = await api.getSellers('limit=100');
-          break;
-        case 'health':
-          res = await api.getSellers('limit=100');
-          break;
-        case 'churning':
-          res = await api.getSellers('persona=Churning Seller&limit=100');
-          break;
-        case 'lazy':
-          res = await api.getSellers('persona=Lazy Seller&limit=100');
-          break;
-        default:
-          res = { sellers: [] };
+        case 'active': res = await api.getSellers('limit=100'); break;
+        case 'health': res = await api.getSellers('limit=100'); break;
+        case 'churning': res = await api.getSellers('persona=Churning Seller&limit=100'); break;
+        case 'lazy': res = await api.getSellers('persona=Lazy Seller&limit=100'); break;
+        default: res = { sellers: [] };
       }
-
       let sellers = res.sellers || [];
-
-      // Sort by health score for the health metric view
-      if (metricType === 'health') {
-        sellers = [...sellers].sort((a, b) => a.health_score - b.health_score);
-      }
-
+      if (metricType === 'health') sellers = [...sellers].sort((a, b) => a.health_score - b.health_score);
       setDrilldownSellers(sellers);
     } catch (e) {
       console.error(e);
@@ -230,7 +187,7 @@ const SalesDashboard = () => {
     lazy:     { title: 'Lazy Sellers', icon: '💤' },
   };
 
-  /* ── Filter high risk sellers ────────────────────────── */
+  /* ── Filters ────────────────────────────────────────── */
   const filteredHighRisk = useMemo(() => {
     if (!data?.high_risk_sellers) return [];
     if (!highRiskSearch.trim()) return data.high_risk_sellers;
@@ -240,6 +197,17 @@ const SalesDashboard = () => {
       String(Math.round(s.health_score)).includes(q)
     );
   }, [data?.high_risk_sellers, highRiskSearch]);
+
+  const filteredInterventions = useMemo(() => {
+    if (!data?.interventions) return [];
+    if (!interventionSearch.trim()) return data.interventions;
+    const q = interventionSearch.toLowerCase();
+    return data.interventions.filter(inv =>
+      String(inv.seller_id).includes(q) ||
+      (inv.company_name || '').toLowerCase().includes(q) ||
+      String(Math.round(inv.health_score || 0)).includes(q)
+    );
+  }, [data?.interventions, interventionSearch]);
 
   if (loading || !data) {
     return (
@@ -265,27 +233,19 @@ const SalesDashboard = () => {
         </div>
       </div>
 
-      {/* ─── Clickable KPI Metrics Row ─── */}
+      {/* ─── KPI Metrics ─── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Active Sellers" value={data.total_active_sellers} type="blue" icon="👥"
-          onClick={() => handleMetricClick('active')} active={activeMetric === 'active'}
-        />
-        <MetricCard
-          title="Seller Health Score" value={`${Math.round(data.avg_health_score)}`} subvalue="/ 100 avg" type="emerald" icon="💚"
-          onClick={() => handleMetricClick('health')} active={activeMetric === 'health'}
-        />
-        <MetricCard
-          title="High Risk (Churning)" value={data.churning_count} type="rose" icon="⚠️"
-          onClick={() => handleMetricClick('churning')} active={activeMetric === 'churning'}
-        />
-        <MetricCard
-          title="Lazy Sellers" value={data.lazy_seller_count} type="amber" icon="💤"
-          onClick={() => handleMetricClick('lazy')} active={activeMetric === 'lazy'}
-        />
+        <MetricCard title="Total Active Sellers" value={data.total_active_sellers} type="blue" icon="👥"
+          onClick={() => handleMetricClick('active')} active={activeMetric === 'active'} />
+        <MetricCard title="Avg Health Score" value={`${Math.round(data.avg_health_score)}`} subvalue="/ 100" type="emerald" icon="💚"
+          onClick={() => handleMetricClick('health')} active={activeMetric === 'health'} />
+        <MetricCard title="High Risk (Churning)" value={data.churning_count} type="rose" icon="⚠️"
+          onClick={() => handleMetricClick('churning')} active={activeMetric === 'churning'} />
+        <MetricCard title="Lazy Sellers" value={data.lazy_seller_count} type="amber" icon="💤"
+          onClick={() => handleMetricClick('lazy')} active={activeMetric === 'lazy'} />
       </div>
 
-      {/* ─── Drill-down panel (appears below metrics when one is clicked) ─── */}
+      {/* ─── Drill-down panel ─── */}
       {activeMetric && (
         <SellerDrilldown
           title={drilldownConfig[activeMetric].title}
@@ -296,61 +256,34 @@ const SalesDashboard = () => {
         />
       )}
 
-      {/* ─── AI Platform Insights ─── */}
-      <Card title="AI Platform Insights" icon="✨" subtitle="Powered by Gemini 2.5 Flash">
-        <div className="ai-recommendation" style={{ marginTop: '0' }}>
-          {aiLoading ? (
-            <div className="loading-container" style={{ padding: '1rem' }}>
-              <div className="loading-spinner"></div>
-              <span>Generating AI insights...</span>
-            </div>
-          ) : aiInsights ? (
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.8, whiteSpace: 'pre-line' }}>
-              {aiInsights}
-            </div>
-          ) : (
-            <div className="empty-state" style={{ padding: '1rem' }}>
-              <p>No insights available yet. Click refresh to generate.</p>
-            </div>
-          )}
-          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="outline" onClick={loadInsights}>
-              🔄 Refresh Insights
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* ─── Two-Column Section ─── */}
+      {/* ─── Two-Column: High Risk + Interventions ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* High Risk Sellers — with search + scroll */}
+        {/* High Risk Sellers */}
         <Card title="High Risk Sellers" icon="🔴">
-          {/* Search bar */}
           <div className="search-input-wrap">
             <span className="search-icon">🔍</span>
-            <input
-              className="search-input"
-              type="text"
+            <input className="search-input" type="text"
               placeholder="Search by seller ID or health score..."
-              value={highRiskSearch}
-              onChange={(e) => setHighRiskSearch(e.target.value)}
-            />
+              value={highRiskSearch} onChange={(e) => setHighRiskSearch(e.target.value)} />
           </div>
-
-          {/* Scrollable list */}
           <div className="seller-scroll-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filteredHighRisk.map((s) => (
-              <div key={s.seller_id} className="seller-list-item">
-                <div>
-                  <Link to={`/seller/${s.seller_id}`}>
-                    Seller #{s.seller_id}
-                  </Link>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Health: {Math.round(s.health_score)} • Engagement: {Math.round(s.engagement_score)}
+              <Link key={s.seller_id} to={`/sales/seller/${s.seller_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="seller-list-item" style={{ cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--im-blue)', fontSize: '0.85rem' }}>
+                      Seller #{s.seller_id}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Health: {Math.round(s.health_score)} • Engagement: {Math.round(s.engagement_score)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Badge type="high">High Risk</Badge>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--im-blue)' }}>Review →</span>
                   </div>
                 </div>
-                <Badge type="high">High Risk</Badge>
-              </div>
+              </Link>
             ))}
             {filteredHighRisk.length === 0 && data.high_risk_sellers?.length > 0 && (
               <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -367,13 +300,21 @@ const SalesDashboard = () => {
         </Card>
 
         {/* Pending Interventions */}
-        <Card title="Pending Interventions" icon="🚨">
+        <Card title="Pending Interventions" icon="🚨" subtitle={`${data.interventions?.length || 0} pending`}>
+          <div className="search-input-wrap">
+            <span className="search-icon">🔍</span>
+            <input className="search-input" type="text"
+              placeholder="Search by seller ID or name..."
+              value={interventionSearch} onChange={(e) => setInterventionSearch(e.target.value)} />
+          </div>
           <div className="seller-scroll-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {data.interventions?.map((inv) => (
+            {filteredInterventions.map((inv) => (
               <div key={inv.id} className="intervention-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <div>
-                    <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{inv.company_name}</span>
+                    <Link to={`/sales/seller/${inv.seller_id}`} style={{ fontWeight: 700, color: 'var(--im-blue)', fontSize: '0.9rem', textDecoration: 'none' }}>
+                      {inv.company_name || `Seller #${inv.seller_id}`}
+                    </Link>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '8px' }}>ID: {inv.seller_id}</span>
                   </div>
                   <Badge type={inv.priority === 'CRITICAL' ? 'hot' : 'warm'}>{inv.priority}</Badge>
@@ -383,10 +324,21 @@ const SalesDashboard = () => {
                   <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--im-red)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     {inv.intervention_type}
                   </span>
-                  <Button variant="primary" onClick={() => resolveIntervention(inv.id)}>✓ Mark Resolved</Button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn-outline" style={{ padding: '5px 12px', fontSize: '0.75rem' }}
+                      onClick={() => unbookmarkIntervention(inv.id)}>
+                      🔖 Unbookmark
+                    </button>
+                    <Button variant="primary" onClick={() => resolveIntervention(inv.id)}>✓ Resolved</Button>
+                  </div>
                 </div>
               </div>
             ))}
+            {filteredInterventions.length === 0 && data.interventions?.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No interventions match "{interventionSearch}"
+              </div>
+            )}
             {!data.interventions?.length && (
               <div className="empty-state">
                 <div className="empty-state-icon">🎉</div>
@@ -397,50 +349,40 @@ const SalesDashboard = () => {
         </Card>
       </div>
 
-      {/* ─── Enhanced Recent Activity Feed ─── */}
-      <Card title="Recent Activity Feed" icon="📋" subtitle={`${data.recent_activity?.length || 0} recent events`}>
-        <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {data.recent_activity?.map((act) => {
-            const cfg = getEventConfig(act.event_type);
-            return (
-              <Link
-                key={act.event_id}
-                to={`/seller/${act.seller_id}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
-              >
-                <div className="activity-feed-item">
-                  {/* Event icon */}
-                  <div className={`activity-icon ${cfg.css}`}>
-                    {cfg.icon}
-                  </div>
-
-                  {/* Details */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
-                        {act.company_name}
-                      </span>
-                      <span className="activity-event-badge">{cfg.label}</span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                      {act.city && `📍 ${act.city}`}
-                      {act.persona_type && ` • ${act.persona_type}`}
-                      {act.service_name && ` • ${act.service_name}`}
-                    </div>
-                  </div>
-
-                  {/* Time */}
-                  <div className="activity-time">
-                    {formatTime(act.timestamp)}
-                  </div>
+      {/* ─── Churn Analysis (replaces Recent Activity) ─── */}
+      <Card title="Churn Indicators Analysis" icon="📉" subtitle={`${churnData?.total_high_risk || 0} high-risk sellers analyzed`}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {churnData?.factors?.map((f, i) => (
+            <div key={i}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1rem' }}>{factorIcons[i] || '📌'}</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{f.factor}</span>
                 </div>
-              </Link>
-            );
-          })}
-          {!data.recent_activity?.length && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{f.count} sellers</span>
+                  <span style={{
+                    fontSize: '0.7rem', fontWeight: 600,
+                    padding: '2px 8px', borderRadius: '12px',
+                    background: f.percentage > 50 ? 'var(--im-red-light)' : f.percentage > 25 ? 'var(--im-amber-light)' : 'var(--im-green-light)',
+                    color: f.percentage > 50 ? 'var(--im-red)' : f.percentage > 25 ? '#B45309' : 'var(--im-green)',
+                  }}>
+                    {f.percentage.toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+              <div className="progress-bar-track">
+                <div className="progress-bar-fill" style={{
+                  width: `${Math.min(f.percentage, 100)}%`,
+                  background: factorColors[i] || 'var(--im-blue)',
+                }}></div>
+              </div>
+            </div>
+          ))}
+          {(!churnData?.factors || churnData.factors.length === 0) && (
             <div className="empty-state">
-              <div className="empty-state-icon">📭</div>
-              <p>No recent activity</p>
+              <div className="empty-state-icon">📊</div>
+              <p>No churn data available yet</p>
             </div>
           )}
         </div>

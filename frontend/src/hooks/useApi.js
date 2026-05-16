@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8080`
+const AI_URL = import.meta.env.VITE_AI_URL || `http://${window.location.hostname}:8081`
 
 export async function fetchAPI(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
@@ -26,16 +27,22 @@ export const api = {
   }),
   getSalesDashboard: () => fetchAPI('/api/dashboard/sales'),
   getMonitoring: () => fetchAPI('/api/dashboard/monitoring'),
+  getChurnAnalysis: () => fetchAPI('/api/dashboard/churn-analysis'),
   getInterventions: () => fetchAPI('/api/interventions'),
   resolveIntervention: (id) => fetchAPI(`/api/interventions/${id}/resolve`, { method: 'POST' }),
+  unbookmarkIntervention: (id) => fetchAPI(`/api/interventions/${id}/unbookmark`, { method: 'POST' }),
+  bookmarkSeller: (id, reason) => fetchAPI(`/api/sellers/${id}/bookmark`, {
+    method: 'POST', body: JSON.stringify({ reason }),
+  }),
   simulateEvent: (data) => fetchAPI('/api/simulate/event', {
     method: 'POST', body: JSON.stringify(data),
   }),
-  getSalesInsights: () => fetch(
-    `${import.meta.env.VITE_AI_URL || `http://${window.location.hostname}:8081`}/score/sales-insights`
-  ).then(r => r.json()),
+  // AI Service calls
+  getSalesInsights: () => fetch(`${AI_URL}/score/sales-insights`).then(r => r.json()),
   generateRecommendation: (sellerId) => fetch(
-    `${import.meta.env.VITE_AI_URL || `http://${window.location.hostname}:8081`}/score/recommendation?seller_id=${sellerId}`,
-    { method: 'POST' }
+    `${AI_URL}/score/recommendation?seller_id=${sellerId}`, { method: 'POST' }
+  ).then(r => r.json()),
+  getSellerAnalysis: (sellerId) => fetch(
+    `${AI_URL}/score/seller-analysis?seller_id=${sellerId}`, { method: 'POST' }
   ).then(r => r.json()),
 }

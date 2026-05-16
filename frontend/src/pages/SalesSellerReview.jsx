@@ -122,7 +122,7 @@ const SalesSellerReview = () => {
       {/* Two Column Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', alignItems: 'stretch' }}>
         {/* LEFT: Performance */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: 0 }}>
           <Card title="Performance Metrics" icon="📊">
             <div style={{ display: 'flex', justifyContent: 'space-around', padding: '16px 0' }}>
               {[
@@ -154,9 +154,9 @@ const SalesSellerReview = () => {
             </div>
           </Card>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <Card title="Seller Activity History" icon="📜" subtitle={`${events.length} events`} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '400px' }}>
+          <Card title="Seller Activity History" icon="📜" subtitle={`${events.length} events`} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '8px', marginRight: '-8px', maxHeight: 'calc(100vh - 480px)' }}>
               {events.slice(0, 40).map((e, i) => (
                 <div key={i} className="event-log-item">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -175,7 +175,7 @@ const SalesSellerReview = () => {
         </div>
 
         {/* RIGHT: AI Analysis + Interventions + Revenue Loss */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: 0 }}>
           {/* AI Churn Analysis */}
           <Card title="AI Churn Analysis" icon="🧠" subtitle="Powered by Gemini 2.5 Flash">
             {analysisLoading ? (

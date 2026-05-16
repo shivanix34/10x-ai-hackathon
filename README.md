@@ -31,7 +31,7 @@ Generative AI agents provide hyper-personalized coaching directly to sellers:
 
 ### **The Intelligence Pipeline**
 ```mermaid
-graph LR
+graph TD
     A["User Events"] --> B{"RabbitMQ"}
     B --> C["AI Scoring Services"]
     C --> D[("PostgreSQL / Redis")]

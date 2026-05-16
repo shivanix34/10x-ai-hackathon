@@ -1,0 +1,9 @@
+service_name,annual_price_1_year_rs,annual_price_2_year_rs,annual_price_3_year_rs,weekly_buylead_allocation,daily_bonus_buylead,estimated_monthly_revenue_rs,estimated_daily_revenue_rs,revenue_tier
+Free,0,0,0,0,0,0,0,Free
+IM IL,300000,500000,800000,70,2,25000,821.92,High
+IM Leader Pro,150000,300000,675000,40,1,12500,410.96,Medium
+IM Star Pro,65000,100000,130000,30,1,5416.67,178.08,Low
+Maximiser Pro,45000,70000,90000,21,1,3750,123.29,Low
+Mini Dynamic Catalog (Annual),32000,55000,72000,10,1,2666.67,87.67,Low
+Mini Dynamic Catalog (Monthly),22000,38000,50000,7,1,1833.33,60.27,Low
+Trustseal Pro,45000,70000,90000,14,1,3750,123.29,Low

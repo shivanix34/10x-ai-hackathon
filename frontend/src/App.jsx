@@ -31,13 +31,6 @@ function App() {
               Seller Experience
             </NavLink>
           </div>
-
-          <div className="nav-status">
-            <div className="live-badge">
-              <span className="live-dot"></span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--im-green)' }}>Live</span>
-            </div>
-          </div>
         </nav>
 
         {/* ─── Main Content ─── */}

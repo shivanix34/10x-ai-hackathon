@@ -57,6 +57,10 @@ func NewRouter(hub *ws.Hub) http.Handler {
 
 	// Churn Analysis
 	r.HandleFunc("/api/dashboard/churn-analysis", churnAnalysisHandler).Methods("GET")
+	r.HandleFunc("/api/dashboard/churn-sellers", churnSellersHandler).Methods("GET")
+
+	// Recommendation tracker
+	r.HandleFunc("/api/sellers/{id}/track-recommendation", trackRecommendationHandler).Methods("POST")
 
 	// Simulation
 	r.HandleFunc("/api/simulate/event", makeSimulateEventHandler(hub)).Methods("POST")
@@ -589,6 +593,139 @@ func churnAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, 200, map[string]interface{}{
 		"total_high_risk": totalHR,
 		"factors":         factors,
+	})
+}
+
+func estimateServiceRevenue(serviceName string) float64 {
+	// Estimated annual subscription revenue for IndiaMART per service tier (in ₹)
+	switch serviceName {
+	case "Free":
+		return 0
+	case "Mini Dynamic Catalog (Monthly)":
+		return 30000
+	case "Mini Dynamic Catalog (Annual)":
+		return 25000
+	case "Trustseal Pro":
+		return 50000
+	case "Maximiser Pro":
+		return 80000
+	case "IM Star Pro":
+		return 120000
+	case "IM Leader Pro":
+		return 200000
+	case "IM IL":
+		return 500000
+	default:
+		return 0
+	}
+}
+
+func churnSellersHandler(w http.ResponseWriter, r *http.Request) {
+	factor := r.URL.Query().Get("factor")
+	if factor == "" {
+		respondJSON(w, 400, map[string]string{"error": "factor param required"})
+		return
+	}
+
+	// All queries now also fetch service_name and revenue_band
+	baseSelect := `SELECT bs.seller_id, COALESCE(s.company_name,''), bs.health_score, bs.engagement_score,
+		s.catalog_quality_score, s.service_name, s.revenue_band
+		FROM seller_behavior_state bs JOIN sellers s ON s.seller_id = bs.seller_id`
+
+	var query string
+	switch factor {
+	case "low_catalog":
+		query = baseSelect + ` WHERE bs.churn_risk='High' AND s.catalog_quality_score < 40
+			ORDER BY s.catalog_quality_score ASC LIMIT 50`
+	case "low_engagement":
+		query = baseSelect + ` WHERE bs.churn_risk='High' AND bs.engagement_score < 30
+			ORDER BY bs.engagement_score ASC LIMIT 50`
+	case "low_response":
+		query = baseSelect + ` WHERE bs.churn_risk='High' AND bs.response_efficiency < 30
+			ORDER BY bs.response_efficiency ASC LIMIT 50`
+	case "low_quota":
+		query = baseSelect + ` WHERE bs.churn_risk='High' AND bs.quota_utilization < 20
+			ORDER BY bs.quota_utilization ASC LIMIT 50`
+	case "high_tickets":
+		query = baseSelect + ` WHERE bs.churn_risk='High' AND s.support_ticket_count > 3
+			ORDER BY s.support_ticket_count DESC LIMIT 50`
+	default:
+		respondJSON(w, 400, map[string]string{"error": "unknown factor"})
+		return
+	}
+
+	rows, err := db.DB.Query(query)
+	if err != nil {
+		respondJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type FactorSeller struct {
+		SellerID       int64   `json:"seller_id"`
+		CompanyName    string  `json:"company_name"`
+		HealthScore    float64 `json:"health_score"`
+		Engagement     float64 `json:"engagement_score"`
+		CatalogScore   float64 `json:"catalog_score"`
+		ServiceName    string  `json:"service_name"`
+		RevenueBand    string  `json:"revenue_band"`
+		EstRevenueLoss float64 `json:"est_revenue_loss"`
+	}
+
+	var sellers []FactorSeller
+	var totalRevenueLoss float64
+	for rows.Next() {
+		var s FactorSeller
+		rows.Scan(&s.SellerID, &s.CompanyName, &s.HealthScore, &s.Engagement,
+			&s.CatalogScore, &s.ServiceName, &s.RevenueBand)
+		s.EstRevenueLoss = estimateServiceRevenue(s.ServiceName)
+		totalRevenueLoss += s.EstRevenueLoss
+		sellers = append(sellers, s)
+	}
+	respondJSON(w, 200, map[string]interface{}{
+		"sellers":            sellers,
+		"count":              len(sellers),
+		"total_revenue_loss": totalRevenueLoss,
+	})
+}
+
+func trackRecommendationHandler(w http.ResponseWriter, r *http.Request) {
+	sellerID, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+
+	// Get leads consumed by this seller and their total value
+	var consumedCount int
+	var totalRevenue float64
+	db.DB.QueryRow(`
+		SELECT COUNT(*), COALESCE(SUM(l.order_value_rs), 0)
+		FROM leads l WHERE l.consumed_by = $1 AND l.status = 'consumed'
+	`, sellerID).Scan(&consumedCount, &totalRevenue)
+
+	// Get seller's baseline weekly lead value for comparison
+	var avgWeeklyLeads float64
+	var avgConsumption float64
+	db.DB.QueryRow(`
+		SELECT COALESCE(avg_weekly_leads, 0), COALESCE(avg_weekly_lead_consumption, 0)
+		FROM sellers WHERE seller_id = $1
+	`, sellerID).Scan(&avgWeeklyLeads, &avgConsumption)
+
+	// Performance improvement: ratio of actual consumption to average
+	perfImprove := 0.0
+	if avgConsumption > 0 {
+		perfImprove = (float64(consumedCount) / avgConsumption - 1.0) * 100
+		if perfImprove < 0 {
+			perfImprove = 0
+		}
+		if perfImprove > 200 {
+			perfImprove = 200
+		}
+	} else if consumedCount > 0 {
+		perfImprove = float64(consumedCount) * 15 // 15% per lead consumed from zero baseline
+	}
+
+	respondJSON(w, 200, map[string]interface{}{
+		"leads_consumed":         consumedCount,
+		"total_revenue":          totalRevenue,
+		"performance_improvement": perfImprove,
 	})
 }
 

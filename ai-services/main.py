@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from scoring.seller_health import compute_seller_health_scores
 from scoring.lead_priority import compute_lead_priority
 from scoring.churn_risk import compute_churn_risk
-from scoring.recommendations import generate_claude_recommendation, generate_sales_insights
+from scoring.recommendations import generate_claude_recommendation, generate_sales_insights, generate_seller_analysis
 from synthetic_data.generator import SyntheticEventGenerator
 from behavior_simulator.simulator import BehaviorSimulator
 

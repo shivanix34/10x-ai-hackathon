@@ -28,12 +28,14 @@ export const api = {
   getSalesDashboard: () => fetchAPI('/api/dashboard/sales'),
   getMonitoring: () => fetchAPI('/api/dashboard/monitoring'),
   getChurnAnalysis: () => fetchAPI('/api/dashboard/churn-analysis'),
+  getChurnSellers: (factor) => fetchAPI(`/api/dashboard/churn-sellers?factor=${factor}`),
   getInterventions: () => fetchAPI('/api/interventions'),
   resolveIntervention: (id) => fetchAPI(`/api/interventions/${id}/resolve`, { method: 'POST' }),
   unbookmarkIntervention: (id) => fetchAPI(`/api/interventions/${id}/unbookmark`, { method: 'POST' }),
   bookmarkSeller: (id, reason) => fetchAPI(`/api/sellers/${id}/bookmark`, {
     method: 'POST', body: JSON.stringify({ reason }),
   }),
+  trackRecommendation: (id) => fetchAPI(`/api/sellers/${id}/track-recommendation`, { method: 'POST' }),
   simulateEvent: (data) => fetchAPI('/api/simulate/event', {
     method: 'POST', body: JSON.stringify(data),
   }),

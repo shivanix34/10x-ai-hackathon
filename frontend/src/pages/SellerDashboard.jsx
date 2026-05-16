@@ -11,20 +11,14 @@ const SellerDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activity, setActivity] = useState([]);
-  const [recLoading, setRecLoading] = useState(false);
 
   const sellerId = parseInt(id, 10);
-  const { lastMessage, messages } = useWebSocket(sellerId, []);
+  const { lastMessage } = useWebSocket(sellerId, []);
 
   const loadData = async () => {
     try {
       const res = await api.getSeller(sellerId);
       setData(res);
-
-      const eventsRes = await api.getSellerEvents(sellerId);
-      setActivity(eventsRes.events || []);
-
       setError(null);
     } catch (e) {
       console.error(e);
@@ -39,10 +33,12 @@ const SellerDashboard = () => {
   useEffect(() => {
     if (!lastMessage) return;
     if (lastMessage.type === 'STATE_UPDATE') {
-      setData(prev => ({ ...prev, behavior_state: lastMessage.data }));
-    } else if (lastMessage.type === 'NEW_LEAD' || lastMessage.type === 'LEAD_UNAVAILABLE' || lastMessage.type === 'LEAD_CONSUMED_SUCCESS') {
-      api.getSellerLeads(sellerId).then(res => setData(prev => ({ ...prev, active_leads: res.leads || [] })));
-      api.getSellerQuota(sellerId).then(res => setData(prev => ({ ...prev, quota: res })));
+      setData(prev => prev ? { ...prev, behavior_state: lastMessage.data } : prev);
+    } else if (lastMessage.type === 'LEAD_CONSUMED_SUCCESS') {
+      // Refresh everything after consuming a lead — engagement + quota will update
+      loadData();
+    } else if (lastMessage.type === 'NEW_LEAD' || lastMessage.type === 'LEAD_UNAVAILABLE') {
+      api.getSellerLeads(sellerId).then(res => setData(prev => prev ? { ...prev, active_leads: res.leads || [] } : prev));
     }
   }, [lastMessage, sellerId]);
 
@@ -50,32 +46,17 @@ const SellerDashboard = () => {
     try { await api.consumeLead(leadId, sellerId); } catch (e) { alert(e.message); }
   };
 
-  const refreshRecommendation = async () => {
-    setRecLoading(true);
-    try {
-      // Pass leads data to AI for best-ROI suggestion
-      const leadsPayload = data?.active_leads || [];
-      const res = await api.generateRecommendation(sellerId);
-      if (res.recommendation) {
-        setData(prev => ({
-          ...prev,
-          behavior_state: { ...prev.behavior_state, recommendation: res.recommendation }
-        }));
-      }
-    } catch (e) { console.error(e); }
-    finally { setRecLoading(false); }
-  };
-
-  // Compute the best ROI lead (highest order value among available leads)
-  const bestLead = useMemo(() => {
-    if (!data?.active_leads?.length) return null;
+  // Top 3 ROI leads
+  const bestLeads = useMemo(() => {
+    if (!data?.active_leads?.length) return [];
     return [...data.active_leads].sort((a, b) => {
-      // Sort by order value desc, then by recency
       const valDiff = (b.lead.order_value_rs || 0) - (a.lead.order_value_rs || 0);
       if (valDiff !== 0) return valDiff;
       return new Date(b.lead.timestamp || 0) - new Date(a.lead.timestamp || 0);
-    })[0];
+    }).slice(0, 3);
   }, [data?.active_leads]);
+
+  const bestLeadIds = useMemo(() => new Set(bestLeads.map(l => l.routing_id)), [bestLeads]);
 
   if (loading || !data) {
     return (
@@ -92,13 +73,14 @@ const SellerDashboard = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* ─── Seller Header (no Simulate Login — shows seller details instead) ─── */}
+      {/* ─── Seller Header + Quota ─── */}
       <div style={{
         background: 'white', borderRadius: 'var(--radius-lg)',
         padding: '1.25rem 1.5rem', border: '1px solid var(--border-color)',
         boxShadow: 'var(--shadow-card)',
       }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          {/* Left: Company info */}
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
               {seller.company_name}
@@ -111,13 +93,34 @@ const SellerDashboard = () => {
               <span>🏷️ {seller.service_name}</span>
             </div>
           </div>
-          <div className="live-badge">
-            <span className="live-dot"></span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--im-green)' }}>Live</span>
+
+          {/* Right: Quota (prominent) */}
+          <div style={{
+            background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)',
+            padding: '12px 24px', textAlign: 'center', minWidth: '200px',
+            border: '1px solid var(--border-light)',
+          }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
+              Weekly Consumption
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
+              {quota.weekly_consumed || 0}
+              <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}> / {quota.weekly_allocation || 0}</span>
+            </div>
+            <div className="progress-bar-track" style={{ marginTop: '8px', height: '6px' }}>
+              <div className="progress-bar-fill" style={{
+                width: `${quotaPercent}%`,
+                background: quotaPercent > 80 ? 'linear-gradient(90deg, var(--im-orange), var(--im-red))' : 'linear-gradient(90deg, var(--im-blue), var(--im-blue-light))',
+                height: '6px',
+              }}></div>
+            </div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {quotaPercent < 50 ? '🟢' : quotaPercent < 80 ? '🟡' : '🔴'} {Math.round(quotaPercent)}% used
+            </div>
           </div>
         </div>
 
-        {/* Seller Details Bar */}
+        {/* Details Bar */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
           gap: '10px', marginTop: '16px', paddingTop: '14px',
@@ -142,168 +145,125 @@ const SellerDashboard = () => {
         </div>
       </div>
 
-      {/* ─── Intelligence + Quota Row ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Behavioral Intelligence — renamed metrics */}
-        <Card title="Seller Intelligence" icon="🧠" className="col-span-1 md:col-span-2">
-          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '16px 0' }}>
+      {/* ─── Seller Intelligence: Scores Left + AI Coach Right ─── */}
+      <Card title="Seller Intelligence" icon="🧠">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '0', minHeight: '200px' }}>
+          {/* LEFT: Three horizontal scores */}
+          <div style={{ borderRight: '1px solid var(--border-light)', paddingRight: '20px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
             <div style={{ textAlign: 'center' }}>
               <ProgressRing value={seller.catalog_quality_score || behavior_state.health_score} color="emerald" />
-              <div style={{ marginTop: '10px', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Catalog Score</div>
+              <div style={{ marginTop: '10px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Catalog Score</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <ProgressRing value={behavior_state.engagement_score} color="blue" />
-              <div style={{ marginTop: '10px', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Engagement</div>
+              <div style={{ marginTop: '10px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Engagement</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <ProgressRing value={behavior_state.routing_priority} color="amber" />
-              <div style={{ marginTop: '10px', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Lead Match Score</div>
+              <div style={{ marginTop: '10px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Lead Match</div>
             </div>
           </div>
 
-          {/* AI Coach Recommendation */}
-          <div className="ai-recommendation" style={{ marginTop: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.1rem' }}>✨</span>
-                <span style={{ fontWeight: 700, color: 'var(--im-blue)', fontSize: '0.9rem' }}>AI Coach</span>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '12px' }}>
-                  Gemini 2.5 Flash
-                </span>
-              </div>
-              <button className="btn-outline" style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                onClick={refreshRecommendation} disabled={recLoading}>
-                {recLoading ? '⏳...' : '🔄 Refresh'}
-              </button>
+          {/* RIGHT: AI Coach (no refresh button — updates reactively) */}
+          <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <span style={{ fontSize: '1.1rem' }}>✨</span>
+              <span style={{ fontWeight: 700, color: 'var(--im-blue)', fontSize: '0.9rem' }}>AI Coach</span>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '12px' }}>
+                Updates with your activity
+              </span>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '0' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '14px' }}>
               {behavior_state.recommendation || "Maintain consistent activity to improve your lead match score and receive better quality leads."}
             </p>
 
-            {/* Best ROI Lead Suggestion */}
-            {bestLead && (
-              <div style={{
-                marginTop: '12px', padding: '12px 16px',
-                background: 'white', borderRadius: 'var(--radius-md)',
-                border: '1px solid rgba(43, 95, 158, 0.2)',
-              }}>
+            {/* Best ROI Leads */}
+            {bestLeads.length > 0 && (
+              <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.85rem' }}>🏆</span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--im-blue)' }}>Best ROI Lead</span>
+                  <span style={{ fontSize: '0.8rem' }}>🏆</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--im-blue)' }}>Top ROI Leads — Respond in 10 min</span>
                 </div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  {bestLead.lead.product_name}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <span>💰 ₹{bestLead.lead.order_value_rs?.toLocaleString()}</span>
-                  <span>📦 {bestLead.lead.quantity} units</span>
-                  <span>📍 {bestLead.lead.buyer_city}</span>
-                  <span>⏱️ Respond within 10 min for best conversion</span>
-                </div>
-                <Button variant="primary" onClick={() => consumeLead(bestLead.lead.lead_id)}>
-                  ⚡ Consume Best Lead →
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Quota Tracker */}
-        <Card title="Consumption Quota" icon="📈" className="col-span-1">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 8px' }}>
-            <div style={{ fontSize: '2.8rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
-              {quota.weekly_consumed || 0}
-              <span style={{ fontSize: '1.3rem', color: 'var(--text-muted)', fontWeight: 500 }}> / {quota.weekly_allocation || 0}</span>
-            </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '8px 0 20px' }}>Weekly Leads Consumed</div>
-
-            <div className="progress-bar-track" style={{ marginBottom: '8px' }}>
-              <div className="progress-bar-fill" style={{
-                width: `${quotaPercent}%`,
-                background: quotaPercent > 80
-                  ? 'linear-gradient(90deg, var(--im-orange), var(--im-red))'
-                  : 'linear-gradient(90deg, var(--im-blue), var(--im-blue-light))'
-              }}></div>
-            </div>
-            <div className="helper-text">
-              {quotaPercent < 50 ? '🟢' : quotaPercent < 80 ? '🟡' : '🔴'}
-              {Math.round(quotaPercent)}% used this week
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* ─── Leads + Activity Row ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Live BuyLeads Feed */}
-        <Card title="Live BuyLeads" icon="📦" className="col-span-2">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {active_leads?.map((l) => {
-              const isBest = bestLead && l.routing_id === bestLead.routing_id;
-              return (
-                <div key={l.routing_id} className="lead-card" style={isBest ? {
-                  borderColor: 'var(--im-blue)', boxShadow: '0 0 0 1px var(--im-blue), var(--shadow-sm)',
-                  position: 'relative',
-                } : {}}>
-                  {isBest && (
-                    <div style={{
-                      position: 'absolute', top: '-1px', right: '12px',
-                      background: 'var(--im-blue)', color: 'white',
-                      padding: '2px 10px', borderRadius: '0 0 6px 6px',
-                      fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.03em',
-                    }}>🏆 BEST ROI</div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{l.lead.product_name}</div>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <span>📍 {l.lead.buyer_city}, {l.lead.buyer_state}</span>
-                    <span>📦 {l.lead.quantity} units</span>
-                    <span>💰 ₹{l.lead.order_value_rs?.toLocaleString()}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{
-                      fontSize: '0.75rem', fontWeight: 600,
-                      color: 'var(--im-orange-dark)', background: 'var(--im-orange-light)',
-                      padding: '3px 10px', borderRadius: 'var(--radius-xl)'
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {bestLeads.map((l, idx) => (
+                    <div key={l.routing_id} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '8px 12px', background: 'white', borderRadius: 'var(--radius-md)',
+                      border: `1px solid ${idx === 0 ? 'var(--im-blue)' : 'var(--border-light)'}`,
                     }}>
-                      Match Score: {Math.round(l.routing_score)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          fontSize: '0.65rem', fontWeight: 700, color: 'white', width: '20px', height: '20px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%',
+                          background: idx === 0 ? 'var(--im-blue)' : idx === 1 ? 'var(--im-orange)' : 'var(--text-muted)',
+                        }}>#{idx + 1}</span>
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{l.lead.product_name}</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            ₹{l.lead.order_value_rs?.toLocaleString()} • {l.lead.buyer_city}
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="primary" onClick={() => consumeLead(l.lead.lead_id)} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>⚡ Consume</Button>
                     </div>
-                    <Button variant="primary" onClick={() => consumeLead(l.lead.lead_id)}>Consume Lead →</Button>
-                  </div>
+                  ))}
                 </div>
-              );
-            })}
-            {!active_leads?.length && (
-              <div className="empty-state">
-                <div className="empty-state-icon">📡</div>
-                <p style={{ marginBottom: '4px' }}>Listening for matching leads...</p>
-                <span className="helper-text">Improve your lead match score to receive leads faster.</span>
               </div>
             )}
           </div>
-        </Card>
+        </div>
+      </Card>
 
-        {/* Activity Stream */}
-        <Card title="Activity Stream" icon="📜" className="col-span-1">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
-            {[...messages.filter(m => m.type !== 'STATE_UPDATE' && m.type !== 'NEW_LEAD'), ...activity].slice(0, 50).map((m, i) => (
-              <div key={i} className="event-log-item">
-                <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '4px' }}>{m.type || m.event_type}</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {m.data ? JSON.stringify(m.data) : (m.metadata || m.event_value)}
+      {/* ─── Full-Width BuyLeads (2 columns) ─── */}
+      <Card title="Live BuyLeads" icon="📦" subtitle={`${active_leads?.length || 0} available`}>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: '12px',
+          justifyContent: 'center',
+        }}>
+          {active_leads?.map((l, idx) => {
+            const isBest = bestLeadIds.has(l.routing_id);
+            const bestIdx = bestLeads.findIndex(b => b.routing_id === l.routing_id);
+            const isLast = idx === active_leads.length - 1 && active_leads.length % 2 !== 0;
+            return (
+              <div key={l.routing_id} className="lead-card" style={{
+                width: isLast ? 'calc(50% - 6px)' : 'calc(50% - 6px)',
+                minWidth: '300px',
+                ...(isBest ? { borderColor: 'var(--im-blue)', position: 'relative' } : {}),
+              }}>
+                {isBest && (
+                  <div style={{
+                    position: 'absolute', top: '-1px', right: '12px',
+                    background: bestIdx === 0 ? 'var(--im-blue)' : bestIdx === 1 ? 'var(--im-orange)' : 'var(--text-muted)',
+                    color: 'white', padding: '2px 10px', borderRadius: '0 0 6px 6px',
+                    fontSize: '0.6rem', fontWeight: 700,
+                  }}>🏆 #{bestIdx + 1} ROI</div>
+                )}
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '8px' }}>{l.lead.product_name}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>📍 {l.lead.buyer_city}, {l.lead.buyer_state}</span>
+                  <span>📦 {l.lead.quantity} units</span>
+                  <span>💰 ₹{l.lead.order_value_rs?.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{
+                    fontSize: '0.75rem', fontWeight: 600,
+                    color: 'var(--im-orange-dark)', background: 'var(--im-orange-light)',
+                    padding: '3px 10px', borderRadius: 'var(--radius-xl)'
+                  }}>Match: {Math.round(l.routing_score)}</div>
+                  <Button variant="primary" onClick={() => consumeLead(l.lead.lead_id)}>Consume Lead →</Button>
                 </div>
               </div>
-            ))}
-            {messages.length === 0 && activity.length === 0 && (
-              <div className="empty-state">
-                <div className="empty-state-icon">📭</div>
-                <p>No recent activity</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
+            );
+          })}
+          {!active_leads?.length && (
+            <div className="empty-state" style={{ width: '100%' }}>
+              <div className="empty-state-icon">📡</div>
+              <p>Listening for matching leads...</p>
+              <span className="helper-text">Improve your lead match score to receive leads faster.</span>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 };

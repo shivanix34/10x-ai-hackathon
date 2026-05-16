@@ -31,4 +31,11 @@ export const api = {
   simulateEvent: (data) => fetchAPI('/api/simulate/event', {
     method: 'POST', body: JSON.stringify(data),
   }),
+  getSalesInsights: () => fetch(
+    `${import.meta.env.VITE_AI_URL || `http://${window.location.hostname}:8081`}/score/sales-insights`
+  ).then(r => r.json()),
+  generateRecommendation: (sellerId) => fetch(
+    `${import.meta.env.VITE_AI_URL || `http://${window.location.hostname}:8081`}/score/recommendation?seller_id=${sellerId}`,
+    { method: 'POST' }
+  ).then(r => r.json()),
 }

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from scoring.seller_health import compute_seller_health_scores
 from scoring.lead_priority import compute_lead_priority
 from scoring.churn_risk import compute_churn_risk
-from scoring.recommendations import generate_claude_recommendation
+from scoring.recommendations import generate_claude_recommendation, generate_sales_insights
 from synthetic_data.generator import SyntheticEventGenerator
 from behavior_simulator.simulator import BehaviorSimulator
 
@@ -54,6 +54,10 @@ async def lifespan(app: FastAPI):
     # Start background event generation
     gen_thread = threading.Thread(target=generator.run_continuous, daemon=True)
     gen_thread.start()
+
+    # Start background recommendation generation
+    rec_thread = threading.Thread(target=run_recommendation_loop, daemon=True)
+    rec_thread.start()
 
     yield
 
@@ -105,6 +109,52 @@ def score_recommendation(seller_id: int):
         return {"status": "error", "message": "Seller not found or error occurred"}
     finally:
         conn.close()
+
+@app.get("/score/sales-insights")
+def get_sales_insights():
+    """Generate AI-powered sales console insights"""
+    conn = get_db()
+    try:
+        insights = generate_sales_insights(conn)
+        return {"status": "ok", "insights": insights}
+    finally:
+        conn.close()
+
+
+def run_recommendation_loop():
+    """Background thread: periodically generates fresh AI recommendations for sellers."""
+    print("[REC] Starting background recommendation loop...")
+    time.sleep(20)  # Wait for system to fully init
+    while True:
+        try:
+            conn = psycopg2.connect(**DB_CONFIG)
+            cur = conn.cursor()
+            # Pick 3 random paid sellers to refresh recommendations
+            cur.execute("""
+                SELECT seller_id FROM sellers
+                WHERE service_name != 'Free'
+                ORDER BY RANDOM() LIMIT 3
+            """)
+            seller_ids = [row[0] for row in cur.fetchall()]
+            cur.close()
+            conn.close()
+
+            for sid in seller_ids:
+                try:
+                    conn2 = psycopg2.connect(**DB_CONFIG)
+                    rec = generate_claude_recommendation(conn2, sid)
+                    if rec:
+                        print(f"[REC] Generated recommendation for seller {sid}: {rec[:50]}...")
+                    conn2.close()
+                except Exception as e:
+                    print(f"[REC] Error for seller {sid}: {e}")
+                time.sleep(2)  # Small delay between API calls
+
+        except Exception as e:
+            print(f"[REC] Loop error: {e}")
+
+        time.sleep(30)  # Run every 30 seconds
+
 
 @app.post("/simulate/events")
 def simulate_events(count: int = 10):

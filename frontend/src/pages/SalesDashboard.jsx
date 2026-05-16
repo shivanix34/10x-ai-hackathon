@@ -133,6 +133,10 @@ const SalesDashboard = () => {
   // High risk search
   const [highRiskSearch, setHighRiskSearch] = useState('');
 
+  // AI Insights
+  const [aiInsights, setAiInsights] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const loadData = async () => {
     try {
       const res = await api.getSalesDashboard();
@@ -146,7 +150,20 @@ const SalesDashboard = () => {
 
   useEffect(() => {
     loadData();
+    loadInsights();
   }, []);
+
+  const loadInsights = async () => {
+    setAiLoading(true);
+    try {
+      const res = await api.getSalesInsights();
+      setAiInsights(res.insights);
+    } catch (e) {
+      console.error('[AI Insights]', e);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (lastMessage && lastMessage.type === 'SELLER_STATE_CHANGE') {
@@ -278,6 +295,31 @@ const SalesDashboard = () => {
           onClose={() => { setActiveMetric(null); setDrilldownSellers(null); }}
         />
       )}
+
+      {/* ─── AI Platform Insights ─── */}
+      <Card title="AI Platform Insights" icon="✨" subtitle="Powered by Gemini 2.5 Flash">
+        <div className="ai-recommendation" style={{ marginTop: '0' }}>
+          {aiLoading ? (
+            <div className="loading-container" style={{ padding: '1rem' }}>
+              <div className="loading-spinner"></div>
+              <span>Generating AI insights...</span>
+            </div>
+          ) : aiInsights ? (
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.8, whiteSpace: 'pre-line' }}>
+              {aiInsights}
+            </div>
+          ) : (
+            <div className="empty-state" style={{ padding: '1rem' }}>
+              <p>No insights available yet. Click refresh to generate.</p>
+            </div>
+          )}
+          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="outline" onClick={loadInsights}>
+              🔄 Refresh Insights
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* ─── Two-Column Section ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

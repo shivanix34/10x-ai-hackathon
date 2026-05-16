@@ -133,11 +133,33 @@ const SellerDashboard = () => {
 
           {/* AI Recommendation Box */}
           <div className="ai-recommendation" style={{ marginTop: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '1.1rem' }}>✨</span>
-              <span style={{ fontWeight: 700, color: 'var(--im-blue)', fontSize: '0.9rem' }}>
-                AI Coach Recommendation
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>✨</span>
+                <span style={{ fontWeight: 700, color: 'var(--im-blue)', fontSize: '0.9rem' }}>
+                  AI Coach Recommendation
+                </span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '12px' }}>
+                  Gemini 2.5 Flash
+                </span>
+              </div>
+              <button
+                className="btn-outline"
+                style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                onClick={async () => {
+                  try {
+                    const res = await api.generateRecommendation(sellerId);
+                    if (res.recommendation) {
+                      setData(prev => ({
+                        ...prev,
+                        behavior_state: { ...prev.behavior_state, recommendation: res.recommendation }
+                      }));
+                    }
+                  } catch (e) { console.error(e); }
+                }}
+              >
+                🔄 Refresh
+              </button>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               {behavior_state.recommendation || "Maintain consistent activity to improve your routing priority and receive better quality leads."}
@@ -182,7 +204,6 @@ const SellerDashboard = () => {
               <div key={l.routing_id} className="lead-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{l.lead.product_name}</div>
-                  <Badge type={l.lead.lead_quality}>{l.lead.lead_quality}</Badge>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <span>📍 {l.lead.buyer_city}, {l.lead.buyer_state}</span>

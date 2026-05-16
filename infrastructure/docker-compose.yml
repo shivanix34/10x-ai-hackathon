@@ -97,7 +97,7 @@ services:
       RABBITMQ_URL: amqp://marketplace:marketplace123@rabbitmq:5672/
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy

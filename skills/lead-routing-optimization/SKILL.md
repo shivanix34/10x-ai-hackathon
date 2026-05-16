@@ -69,7 +69,7 @@ Marketplace leads go to wrong sellers:
 }
 ```
 
-## Business Impact
+## Predicted Business Impact
 
 | Metric | Before | After | Gain |
 |--------|--------|-------|------|

@@ -153,7 +153,7 @@ Marketplace behavioral events (login, catalog update, lead response, message, no
 }
 ```
 
-## Business Impact
+## Predicted Business Impact
 
 | Metric | Before | After | Impact |
 |--------|--------|-------|--------|

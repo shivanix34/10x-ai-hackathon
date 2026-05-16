@@ -139,7 +139,7 @@ Current intervention approaches are generic and reactive:
 }
 ```
 
-## Business Impact
+## Predicted Business Impact
 
 | Metric | Before | After | Impact |
 |--------|--------|-------|--------|

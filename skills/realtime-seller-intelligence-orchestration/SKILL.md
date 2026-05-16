@@ -77,7 +77,7 @@ Seller retention directly impacts marketplace revenue, ecosystem health, and ope
 
 ---
 
-## Measurable Business Impact
+## Predicted Business Impact
 
 | Metric | Before | After | Impact |
 |--------|--------|-------|--------|

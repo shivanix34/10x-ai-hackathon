@@ -6,14 +6,61 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Link } from 'react-router-dom';
 
+/* ── Fuzzy matching utility ──────────────────────────── */
+const levenshtein = (a, b) => {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+};
+
+const fuzzyMatch = (text, query) => {
+  if (!text || !query) return false;
+  const t = text.toLowerCase();
+  const q = query.toLowerCase();
+  // Exact substring match
+  if (t.includes(q)) return true;
+  // Word-level fuzzy: check each word in text against query
+  const words = t.split(/[\s,]+/);
+  const qWords = q.split(/[\s,]+/);
+  return qWords.every(qw => {
+    if (qw.length <= 1) return t.includes(qw);
+    return words.some(w => {
+      if (w.includes(qw) || qw.includes(w)) return true;
+      // Allow edit distance proportional to word length
+      const maxDist = qw.length <= 3 ? 1 : qw.length <= 6 ? 2 : 3;
+      return levenshtein(w, qw) <= maxDist;
+    });
+  });
+};
+
 /* ── Drill-down panel ─────────────────────────────────── */
 const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
     if (!sellers) return [];
     if (!search.trim()) return sellers;
-    const q = search.toLowerCase();
-    return sellers.filter(s => (s.company_name || '').toLowerCase().includes(q) || String(s.seller_id).includes(q));
+    return sellers.filter(s => {
+      const q = search.trim();
+      // Match on seller_id
+      if (String(s.seller_id).includes(q)) return true;
+      // Fuzzy match on company name
+      if (fuzzyMatch(s.company_name, q)) return true;
+      // Fuzzy match on city / state (location)
+      if (fuzzyMatch(s.city, q)) return true;
+      if (fuzzyMatch(s.state, q)) return true;
+      return false;
+    });
   }, [sellers, search]);
 
   return (
@@ -22,20 +69,23 @@ const SellerDrilldown = ({ title, icon, sellers, onClose, loading }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '1.1rem' }}>{icon}</span>
           <span style={{ fontWeight: 700, fontSize: '1rem' }}>{title}</span>
-          <span style={{ background: 'var(--im-blue-lighter)', color: 'var(--im-blue)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 600 }}>{sellers?.length || 0}</span>
         </div>
         <button className="drilldown-close" onClick={onClose}>✕</button>
       </div>
       <div className="search-input-wrap"><span className="search-icon">🔍</span>
-        <input className="search-input" type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="search-input" type="text" placeholder="Search by name, ID, or location..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       {loading ? <div className="loading-container" style={{ padding: '2rem' }}><div className="loading-spinner"></div></div> : (
         <div className="seller-scroll-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {filtered.map(s => (
             <div key={s.seller_id} className="seller-list-item">
               <div>
-                <Link to={`/sales/seller/${s.seller_id}`} style={{ fontWeight: 600, color: 'var(--im-blue)', textDecoration: 'none' }}>{s.company_name || `Seller #${s.seller_id}`}</Link>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>{s.health_score != null && `Health: ${Math.round(s.health_score)}`}</div>
+                <Link to={`/sales/seller/${s.seller_id}`} style={{ fontWeight: 600, color: 'var(--im-blue)', textDecoration: 'none' }}>
+                  {s.company_name || `Seller #${s.seller_id}`}
+                </Link>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  ID: {s.seller_id}{s.city ? ` • 📍 ${s.city}` : ''}{s.health_score != null ? ` • Health: ${Math.round(s.health_score)}` : ''}
+                </div>
               </div>
               <Link to={`/sales/seller/${s.seller_id}`} style={{ fontSize: '0.75rem', color: 'var(--im-blue)', textDecoration: 'none' }}>Review →</Link>
             </div>
@@ -52,7 +102,7 @@ const factorConfig = [
   { key: 'low_catalog', color: '#DC3545', label: 'Low Catalog' },
   { key: 'low_engagement', color: '#E8A500', label: 'Low Engagement' },
   { key: 'low_response', color: '#2B5F9E', label: 'Poor Response' },
-  { key: 'low_quota', color: '#F0AD4E', label: 'Low Quota' },
+  { key: 'low_quota', color: '#F0AD4E', label: 'Low Buylead Consumption' },
   { key: 'high_tickets', color: '#7C3AED', label: 'High Tickets' },
 ];
 
@@ -185,9 +235,9 @@ const SalesDashboard = () => {
     try {
       let res;
       switch (metricType) {
-        case 'active': case 'health': res = await api.getSellers('limit=100'); break;
-        case 'churning': res = await api.getSellers('persona=Churning Seller&limit=100'); break;
-        case 'lazy': res = await api.getSellers('persona=Lazy Seller&limit=100'); break;
+        case 'active': case 'health': res = await api.getSellers('limit=5000'); break;
+        case 'churning': res = await api.getSellers('persona=Churning Seller&limit=5000'); break;
+        case 'lazy': res = await api.getSellers('persona=Lazy Seller&limit=5000'); break;
         default: res = { sellers: [] };
       }
       let sellers = res.sellers || [];
@@ -225,7 +275,7 @@ const SalesDashboard = () => {
       <div className="page-header">
         <div className="section-header">
           <div className="section-header-icon" style={{ background: 'var(--im-red-light)', color: 'var(--im-red)' }}>📊</div>
-          <h1 className="section-title">Sales & Retention Console</h1>
+          <h1 className="section-title">Sales Insights</h1>
         </div>
         <p className="section-subtitle" style={{ marginLeft: '42px' }}>Click any metric to drill down</p>
       </div>

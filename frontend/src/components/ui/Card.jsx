@@ -9,9 +9,9 @@ const iconMap = {
   violet: '🔌',
 };
 
-export const Card = ({ children, className = '', title, subtitle, icon }) => {
+export const Card = ({ children, className = '', title, subtitle, icon, style }) => {
   return (
-    <div className={`glass-card animate-in ${className}`}>
+    <div className={`glass-card animate-in ${className}`} style={style}>
       {(title || subtitle) && (
         <div className="card-header">
           <div className="card-title">
@@ -21,7 +21,9 @@ export const Card = ({ children, className = '', title, subtitle, icon }) => {
           {subtitle && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{subtitle}</span>}
         </div>
       )}
-      {children}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
     </div>
   );
 };

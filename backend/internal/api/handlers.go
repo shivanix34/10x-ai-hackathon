@@ -91,7 +91,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 func listSellersHandler(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 || limit > 100 {
+	if limit <= 0 || limit > 5000 {
 		limit = 50
 	}
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
@@ -545,49 +545,71 @@ func churnAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 		Percentage float64 `json:"percentage"`
 	}
 
-	var totalHR int
-	db.DB.QueryRow(`SELECT COUNT(*) FROM seller_behavior_state WHERE churn_risk='High'`).Scan(&totalHR)
-	if totalHR == 0 {
-		totalHR = 1 // prevent div by 0
+	// Query churning sellers (persona_type='Churning Seller') with all relevant scores
+	// This ensures total_high_risk matches the Churning count on the dashboard
+	rows, err := db.DB.Query(`
+		SELECT bs.seller_id, COALESCE(s.catalog_quality_score,50),
+		       COALESCE(bs.engagement_score,50), COALESCE(bs.response_efficiency,50),
+		       COALESCE(bs.quota_utilization,50), COALESCE(s.support_ticket_count,0)
+		FROM seller_behavior_state bs
+		JOIN sellers s ON s.seller_id = bs.seller_id
+		WHERE s.persona_type='Churning Seller'
+	`)
+	if err != nil {
+		respondJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	counts := map[string]int{
+		"low_catalog":   0,
+		"low_engagement": 0,
+		"low_response":  0,
+		"low_quota":     0,
+		"high_tickets":  0,
+	}
+	totalHR := 0
+
+	for rows.Next() {
+		var sellerID int64
+		var catalogScore, engScore, respEff, quotaUtil float64
+		var ticketCount int
+		rows.Scan(&sellerID, &catalogScore, &engScore, &respEff, &quotaUtil, &ticketCount)
+
+		if catalogScore < 40 {
+			counts["low_catalog"]++
+			totalHR++
+		}
+		if engScore < 30 {
+			counts["low_engagement"]++
+			totalHR++
+		}
+		if respEff < 30 {
+			counts["low_response"]++
+			totalHR++
+		}
+		if quotaUtil < 20 {
+			counts["low_quota"]++
+			totalHR++
+		}
+		if ticketCount > 3 {
+			counts["high_tickets"]++
+			totalHR++
+		}
 	}
 
-	var lowCatalog, lowEngagement, lowResponse, lowQuota, highTickets int
-
-	db.DB.QueryRow(`
-		SELECT COUNT(*) FROM seller_behavior_state bs
-		JOIN sellers s ON s.seller_id = bs.seller_id
-		WHERE bs.churn_risk='High' AND s.catalog_quality_score < 40
-	`).Scan(&lowCatalog)
-
-	db.DB.QueryRow(`
-		SELECT COUNT(*) FROM seller_behavior_state
-		WHERE churn_risk='High' AND engagement_score < 30
-	`).Scan(&lowEngagement)
-
-	db.DB.QueryRow(`
-		SELECT COUNT(*) FROM seller_behavior_state
-		WHERE churn_risk='High' AND response_efficiency < 30
-	`).Scan(&lowResponse)
-
-	db.DB.QueryRow(`
-		SELECT COUNT(*) FROM seller_behavior_state
-		WHERE churn_risk='High' AND quota_utilization < 20
-	`).Scan(&lowQuota)
-
-	db.DB.QueryRow(`
-		SELECT COUNT(*) FROM seller_behavior_state bs
-		JOIN sellers s ON s.seller_id = bs.seller_id
-		WHERE bs.churn_risk='High' AND s.support_ticket_count > 3
-	`).Scan(&highTickets)
+	if totalHR == 0 {
+		totalHR = 1 // prevent div by 0 in percentage
+	}
 
 	pct := func(n int) float64 { return float64(n) / float64(totalHR) * 100 }
 
 	factors := []ChurnFactor{
-		{"Low Catalog Score (<40)", lowCatalog, pct(lowCatalog)},
-		{"Low Engagement (<30)", lowEngagement, pct(lowEngagement)},
-		{"Poor Response Rate (<30%)", lowResponse, pct(lowResponse)},
-		{"Low Quota Usage (<20%)", lowQuota, pct(lowQuota)},
-		{"High Support Tickets (>3)", highTickets, pct(highTickets)},
+		{"Low Catalog Score (<40)", counts["low_catalog"], pct(counts["low_catalog"])},
+		{"Low Engagement (<30)", counts["low_engagement"], pct(counts["low_engagement"])},
+		{"Poor Response Rate (<30%)", counts["low_response"], pct(counts["low_response"])},
+		{"Low Buylead Consumption (<20%)", counts["low_quota"], pct(counts["low_quota"])},
+		{"High Support Tickets (>3)", counts["high_tickets"], pct(counts["high_tickets"])},
 	}
 
 	respondJSON(w, 200, map[string]interface{}{
@@ -597,24 +619,24 @@ func churnAnalysisHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func estimateServiceRevenue(serviceName string) float64 {
-	// Estimated annual subscription revenue for IndiaMART per service tier (in ₹)
+	// Annual subscription revenue from updated_service_revenue_dataset_hackathon.csv (annual_price_1_year_rs)
 	switch serviceName {
 	case "Free":
 		return 0
 	case "Mini Dynamic Catalog (Monthly)":
-		return 30000
+		return 48000
 	case "Mini Dynamic Catalog (Annual)":
-		return 25000
+		return 32000
 	case "Trustseal Pro":
 		return 50000
 	case "Maximiser Pro":
-		return 80000
+		return 75000
 	case "IM Star Pro":
-		return 120000
+		return 100000
 	case "IM Leader Pro":
 		return 200000
 	case "IM IL":
-		return 500000
+		return 750000
 	default:
 		return 0
 	}

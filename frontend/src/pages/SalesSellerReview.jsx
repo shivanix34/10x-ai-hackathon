@@ -7,13 +7,13 @@ import { Button, ProgressRing } from '../components/ui/Button';
 
 const SERVICE_REVENUE_MAP = {
   'Free': 0,
-  'Mini Dynamic Catalog (Monthly)': 30000,
-  'Mini Dynamic Catalog (Annual)': 25000,
+  'Mini Dynamic Catalog (Monthly)': 48000,
+  'Mini Dynamic Catalog (Annual)': 32000,
   'Trustseal Pro': 50000,
-  'Maximiser Pro': 80000,
-  'IM Star Pro': 120000,
+  'Maximiser Pro': 75000,
+  'IM Star Pro': 100000,
   'IM Leader Pro': 200000,
-  'IM IL': 500000,
+  'IM IL': 750000,
 };
 
 const formatRevenue = (val) => {
@@ -100,7 +100,7 @@ const SalesSellerReview = () => {
         justifyContent: 'space-between', alignItems: 'center', gap: '1rem',
       }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>{seller.company_name}</h1>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: 1.1 }}>{seller.company_name}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             <span>📍 {seller.city}, {seller.state}</span>
             <span style={{ color: 'var(--border-color)' }}>•</span>
@@ -120,7 +120,7 @@ const SalesSellerReview = () => {
       </div>
 
       {/* Two Column Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', alignItems: 'stretch' }}>
         {/* LEFT: Performance */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <Card title="Performance Metrics" icon="📊">
@@ -144,7 +144,7 @@ const SalesSellerReview = () => {
                 { label: 'Rating', value: `${seller.seller_rating?.toFixed(1) || '—'} ★` },
                 { label: 'Last Active', value: `${seller.last_active_days_ago}d ago` },
                 { label: 'Support Tickets', value: seller.support_ticket_count },
-                { label: 'Notif Open Rate', value: `${(seller.notification_open_rate * 100)?.toFixed(0) || '—'}%` },
+                { label: 'Notif Open Rate', value: `${(seller.notification_open_rate)?.toFixed(0) || '—'}%` },
               ].map((s, i) => (
                 <div key={i} style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{s.value}</div>
@@ -154,8 +154,9 @@ const SalesSellerReview = () => {
             </div>
           </Card>
 
-          <Card title="Seller Activity History" icon="📜" subtitle={`${events.length} events`}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Card title="Seller Activity History" icon="📜" subtitle={`${events.length} events`} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
               {events.slice(0, 40).map((e, i) => (
                 <div key={i} className="event-log-item">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -170,6 +171,7 @@ const SalesSellerReview = () => {
               {events.length === 0 && <div className="empty-state"><p>No activity recorded</p></div>}
             </div>
           </Card>
+          </div>
         </div>
 
         {/* RIGHT: AI Analysis + Interventions + Revenue Loss */}

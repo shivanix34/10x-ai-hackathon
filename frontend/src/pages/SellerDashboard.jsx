@@ -82,7 +82,7 @@ const SellerDashboard = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           {/* Left: Company info */}
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
+            <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: 1.1 }}>
               {seller.company_name}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -147,8 +147,8 @@ const SellerDashboard = () => {
 
       {/* ─── Seller Intelligence: Scores Left + AI Coach Right ─── */}
       <Card title="Seller Intelligence" icon="🧠">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '0', minHeight: '200px' }}>
-          {/* LEFT: Three horizontal scores */}
+        <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.6fr', gap: '0', minHeight: '200px' }}>
+          {/* LEFT: Two horizontal scores */}
           <div style={{ borderRight: '1px solid var(--border-light)', paddingRight: '20px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
             <div style={{ textAlign: 'center' }}>
               <ProgressRing value={seller.catalog_quality_score || behavior_state.health_score} color="emerald" />
@@ -157,10 +157,6 @@ const SellerDashboard = () => {
             <div style={{ textAlign: 'center' }}>
               <ProgressRing value={behavior_state.engagement_score} color="blue" />
               <div style={{ marginTop: '10px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Engagement</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <ProgressRing value={behavior_state.routing_priority} color="amber" />
-              <div style={{ marginTop: '10px', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Lead Match</div>
             </div>
           </div>
 
@@ -244,12 +240,7 @@ const SellerDashboard = () => {
                   <span>📦 {l.lead.quantity} units</span>
                   <span>💰 ₹{l.lead.order_value_rs?.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{
-                    fontSize: '0.75rem', fontWeight: 600,
-                    color: 'var(--im-orange-dark)', background: 'var(--im-orange-light)',
-                    padding: '3px 10px', borderRadius: 'var(--radius-xl)'
-                  }}>Match: {Math.round(l.routing_score)}</div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                   <Button variant="primary" onClick={() => consumeLead(l.lead.lead_id)}>Consume Lead →</Button>
                 </div>
               </div>
